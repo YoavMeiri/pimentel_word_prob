@@ -17,8 +17,9 @@ class BaseBOWModel(ABC):
     tokenizer_cls = None
     model_name = None
 
-    def __init__(self):
-        self.model, self.tokenizer = self._initialise_model()
+    def __init__(self, model, tokenizer):
+        self.model = model
+        self.tokenizer = tokenizer
 
         self.device = self.model.device
         self.bos_token_id = self.tokenizer.bos_token_id
@@ -95,14 +96,16 @@ class BaseBOWModel(ABC):
         )
         return midword_mask
 
-    def get_predictions(self, sentence, use_bos_symbol=True):
-        return self.get_models_output(sentence, use_bos_symbol=use_bos_symbol)
+    def get_predictions(self, sentence, use_bos_symbol=True, overlap_size=512):
+        return self.get_models_output(
+            sentence, use_bos_symbol=use_bos_symbol, stride=overlap_size
+        )
 
-    def get_models_output(self, sentence, use_bos_symbol=True, stride=200):
+    def get_models_output(self, sentence, stride, use_bos_symbol=True):
         sentence = sentence
         with torch.no_grad():
             all_results = {
-                metric: torch.tensor([], device=self.device) for metric in self.metrics
+                metric: torch.tensor([], device="cpu") for metric in self.metrics
             }
             offset_mapping = []
             start_ind = 0
@@ -172,7 +175,7 @@ class BaseBOWModel(ABC):
         # ToDo: Should punctuation be a bow as well?
         # bow_fix = - np.log(((self.bow_mask + self.punct_mask) * probs).sum(-1))
         bow_vocab = self.vocab_masks["bow"] + self.vocab_masks["eos"]
-        bow_fix = -torch.log((bow_vocab * probs).sum(-1))
+        bow_fix = -torch.log((bow_vocab.to(self.device) * probs).sum(-1))
 
         return bow_fix.view(-1).cpu().numpy()
 
@@ -183,7 +186,7 @@ class BaseBOWModel(ABC):
             + self.vocab_masks["punct"]
             + self.vocab_masks["eos"]
         )
-        bos_fix = -torch.log((bos_vocab * probs).sum(-1))
+        bos_fix = -torch.log((bos_vocab.to(self.device) * probs).sum(-1))
 
         return bos_fix.view(-1).cpu().numpy()
 
