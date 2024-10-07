@@ -23,10 +23,10 @@ def get_args():
     return parser.parse_args()
 
 
-def get_surprisals_per_subword(text, model_name):
+def get_surprisals_per_subword(text, model_name, model, tokenizer):
     dfs = []
 
-    model = get_model(model_name)
+    model = get_model(model_name=model_name, model=model, tokenizer=tokenizer)
     for text_id, utterance in enumerate(text):
         results, offsets = model.get_predictions(utterance.strip())
 
@@ -93,17 +93,29 @@ def agg_surprisal_per_word(
 def _get_surprisal_per_word(
     text_list: List[str],
     model_name: str,
+    model,
+    tokenizer,
     return_buggy_surprisals: Optional[bool] = False,
 ) -> pd.DataFrame:
-    df = get_surprisals_per_subword(text_list, model_name)
+    df = get_surprisals_per_subword(text_list, model_name, model, tokenizer)
     return agg_surprisal_per_word(df, model_name, return_buggy_surprisals)
 
 
 def get_surprisal_per_word(
-    text: str, model_name: str, return_buggy_surprisals: Optional[bool] = False
+    text: str,
+    model_name: str,
+    model,
+    tokenizer,
+    return_buggy_surprisals: Optional[bool] = False,
 ) -> pd.DataFrame:
     text_list = text.split("\n")
-    return _get_surprisal_per_word(text_list, model_name, return_buggy_surprisals)
+    return _get_surprisal_per_word(
+        text_list,
+        model_name,
+        return_buggy_surprisals=return_buggy_surprisals,
+        model=model,
+        tokenizer=tokenizer,
+    )
 
 
 def main():
@@ -111,7 +123,17 @@ def main():
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     text = ["Hi, my name is John. I like playing sports."]
-    df = _get_surprisal_per_word(text, "pythia-70m", return_buggy_surprisals=True)
+    from text_metrics.utils import init_tok_n_model
+
+    model_name = "EleutherAI/pythia-70m"
+    tokenizer, model = init_tok_n_model(model_name=model_name, device="cuda")
+    df = _get_surprisal_per_word(
+        text,
+        model_name=model_name,
+        model=model,
+        tokenizer=tokenizer,
+        return_buggy_surprisals=False,
+    )
     print(df)
 
 
